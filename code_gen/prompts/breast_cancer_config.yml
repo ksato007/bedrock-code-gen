@@ -1,0 +1,646 @@
+project_name: "Breast Cancer Classification"
+dataset_names: "Breast Cancer Wisconsin (Diagnostic) Data Set"
+project_structure: |
+  breast_cancer/
+  ├── src/
+  │   ├── preprocess.py
+  │   ├── model.py
+  │   ├── evaluate.py
+  │   ├── inference.py
+  ├── main.py
+  ├── tests/
+  │   ├── test_preprocess.py
+  │   ├── test_model.py
+  │   ├── test_evaluate.py
+  │   ├── test_inference.py
+  ├── pytest.ini
+  ├── conftest.py
+  └── requirements.txt
+
+pytest_config:
+  filename: pytest.ini
+  content: |
+    [pytest]
+    pythonpath = . src
+    markers =
+        optional: mark tests as optional
+        last: marks tests that should run last
+        temp_file: marks tests that use temporary files
+    addopts = -v --tb=short --strict-markers --import-mode=importlib  --basetemp=./tmp
+    testpaths = tests
+    python_files = test_*.py
+    python_classes = Test*
+    python_functions = test_*
+    venv_name = {venv_name}
+
+conftest:
+  filename: conftest.py
+  content: |
+    import pytest
+    import os
+    import sys
+    import tempfile
+    import shutil
+
+    def pytest_addoption(parser):
+        parser.addini('venv_name', 'Name of the virtual environment', default='.venv')
+
+    def pytest_collection_modifyitems(items):
+        # Ensure tests marked with 'last' run at the end of the test suite.
+        last_tests = [item for item in items if item.get_closest_marker("last")]
+        for test in last_tests:
+            items.remove(test)
+            items.append(test)
+
+    @pytest.fixture(scope="session", autouse=True)
+    def setup_test_environment(request):
+        # Set up the test environment before running tests.
+        # Get the expected virtual environment path
+        project_root = os.path.dirname(os.path.dirname(__file__))  # ex. breast_cancer directory
+        expected_venv_path = os.path.join(project_root, "{venv_name}")
+        
+        # Check if we're running in the correct virtual environment
+        current_venv = os.environ.get("VIRTUAL_ENV")
+        if current_venv != expected_venv_path:
+            pytest.exit(f"Tests are not running in the expected virtual environment. Expected: {{expected_venv_path}} Current: {{current_venv}}")
+
+        # Add the project root to sys.path if it's not already there
+        if project_root not in sys.path:
+            sys.path.insert(0, project_root)
+
+        # Add the src directory to sys.path if it's not already there
+        src_dir = os.path.join(project_root, "src")
+        if src_dir not in sys.path:
+            sys.path.insert(0, src_dir)
+
+        # Print some debug information
+        print(f"Project root: {{project_root}}")
+        print(f"Expected venv path: {{expected_venv_path}}")
+        print(f"Current VIRTUAL_ENV: {{current_venv}}")
+        print(f"PYTHONPATH: {{os.environ.get('PYTHONPATH', 'Not set')}}")
+        print(f"sys.path: {{sys.path}}")
+
+        # Create a temporary directory for the test session
+        temp_dir = tempfile.mkdtemp()
+        request.addfinalizer(lambda: shutil.rmtree(temp_dir))
+        return temp_dir
+
+    @pytest.fixture(scope="function")
+    def sample_data():
+        # Provide sample data for tests.
+        # Return some sample data that can be used across multiple tests
+        return {{
+            "features": [f"feature_{{i}}" for i in range(30)],
+            "target": "diagnosis",
+            "data": {{
+                f"feature_{{i}}": [1.0, 2.0, 3.0] for i in range(30)
+            }}
+        }}
+
+    @pytest.fixture(scope="function")
+    def temp_dir(tmp_path):
+        # Provide a temporary directory for the test function.
+        return tmp_path
+
+    @pytest.fixture(scope="function")
+    def temp_file(temp_dir):
+        # Provide a temporary file for the test function.
+        temp_file = temp_dir / "test_file.txt"
+        temp_file.write_text("This is a test file.")
+        return temp_file
+
+coveragerc:
+  filename: .coveragerc
+  content: |
+    [run]
+    omit = tests/conftest.py, main.py, *__init__.py
+    parallel = True
+    fail_under = 80
+
+modules:
+  requirements:
+    filename: requirements.txt
+    description: "Lists all the external dependencies and their versions required to run the program."
+    steps: |
+      1. Specify each required library and its version on a separate line.
+      2. Include libraries such as pandas, numpy, scikit-learn, tensorflow, and keras, along with their respective minimum version requirements.
+    code: |
+      pandas
+      numpy
+      scikit-learn
+      tensorflow
+  preprocess:
+    filename: src/preprocess.py
+    description: "This module contains functions to preprocess the breast cancer dataset, including data cleaning and feature scaling."
+    steps: |
+      1. Import the necessary libraries: pandas, numpy, and sklearn.
+      2. Define load_data function:
+          a. Accept file_path argument (optional)
+          b. Load data from file if provided, else from sklearn
+              - When loading from sklearn:
+                  - Use load_breast_cancer() to get the dataset
+                  - The dataset has the following structure:
+                      - 'data': a numpy array of shape (569, 30) containing the feature values
+                      - 'target': a numpy array of shape (569,) containing the binary target values (0 or 1)
+                      - 'target_names': a numpy array of shape (2,) containing the string labels for the target values ('malignant' and 'benign')
+                      - 'feature_names': a numpy array of shape (30,) containing the string names for the 30 features
+              - Handle both cases: when data is already a DataFrame (from file) and when it's a Bunch object (from sklearn)
+          d. Handle exceptions for file not found
+      3. Define preprocess_data function:
+          a Load data using load_data if needed
+          b Remove duplicates
+          c Handle exceptions for missing values
+          d Scale features using MinMaxScaler
+          e Handle exceptions for invalid input
+      4. Include error handling for exceptions.
+      5. Add docstrings and type hints.
+    imports: |
+      import pandas as pd
+      import numpy as np
+      from sklearn.datasets import load_breast_cancer
+      from sklearn.preprocessing import MinMaxScaler
+
+  model:
+    filename: src/model.py
+    description: "Defines the machine learning model architecture for binary classification of the breast cancer dataset."
+    steps: |
+      1. Import necessary libraries (tensorflow, keras).
+      2. Define the build_model function that creates a dense neural network with the following architecture:
+          - Input layer: 30 neurons (matching the number of input features)
+          - Hidden layer 1: 32 neurons with ReLU activation and L2 regularization (kernel_regularizer=regularizers.l2(0.001))
+          - Dropout layer: 30% dropout rate
+          - Hidden layer 2: 16 neurons with ReLU activation and L2 regularization (kernel_regularizer=regularizers.l2(0.001))
+          - Dropout layer: 20% dropout rate
+          - Output layer: 1 neuron with sigmoid activation
+          - Set random seed for reproducibility: tf.random.set_seed(42)
+      3. Compile the model with Adam optimizer, binary cross-entropy loss function, and evaluation metrics: accuracy, precision, recall, auc.
+      4. Implement a split_data function to divide the preprocessed data into training, validation, and test sets (70% training, 20% validation, 10% test).
+      5. Implement the train_model functon:
+          a. Reshape the target data (y_train and y_val) to have a 2D shape (num_samples, 1) using np.reshape or tf.reshape.
+          b. Train the model with early stopping and model checkpointing.
+          c. Return the path to the saved model file (.keras format) and training history.
+          d. Use tf.keras.models.save_model(model, filepath) to save the model.
+      6. Implement error handling for exceptions.
+      7. When defining the model architecture, provide explicit names for layers (e.g., "dense_1", "dropout_1", "dense_2", "dropout_2", "output").
+    imports: |
+      import tensorflow as tf
+      from tensorflow.keras import layers, regularizers
+      from sklearn.model_selection import train_test_split
+      import numpy as np
+
+  evaluate:
+    filename: src/evaluate.py
+    description: "This module contains functions to evaluate the performance of the trained binary classification model for the breast cancer dataset."
+    steps: |
+      1. Import necessary libraries (sklearn.metrics, tensorflow).
+      2. Define load_model function:
+          - Load model from specified file (TensorFlow SavedModel or Keras V3 format)
+          - Handle exceptions for non-existent model files and invalid model files
+      3. Define load_test_data function:
+          - Load preprocessed test data from .npz file
+          - Handle exceptions for unexpected data formats and missing data files
+      4. Define evaluate_model function:
+          - Take model, X_test, and y_test as inputs
+          - Make predictions on test data
+          - Calculate metrics: accuracy, precision, recall, auc
+          - Return dictionary of evaluation results
+    imports: |
+      import tensorflow as tf
+      from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
+      import numpy as np
+
+  inference:
+    filename: src/inference.py
+    description: "This module contains functions to make predictions on new, unseen data using the trained binary classification model for the breast cancer dataset."
+    steps: |
+      1. Import necessary libraries (numpy, pandas, tensorflow) and from src.preprocess import preprocess_data.
+      2. Define a function `load_model` that loads the trained model from the specified file path. The model should be saved in the TensorFlow SavedModel format or the Keras V3 format 
+      3. Define a function `preprocess_input_data` that takes new, unseen data as input.
+      4. Inside the `preprocess_input_data` function:
+          a. Call the preprocess_data function from src.preprocess to preprocess the input data, including handling missing values and scaling the features.
+          b. Return the preprocessed input data.
+          c. Implement error handling for exceptions if the input data is invalid or has incorrect data types.
+      5. Define a function `make_predictions` that takes the preprocessed input data and the loaded model as input, and returns the model predictions.
+      6. Inside the `make_predictions` function:
+          a. Make predictions using the loaded model and the preprocessed input data.
+          b. Implement error handling for exceptions when making predictions, such as invalid model or data.
+          c. Return the predictions.
+    imports: |
+      import numpy as np
+      import pandas as pd
+      import tensorflow as tf
+      from src.preprocess import preprocess_data
+  main:
+    filename: main.py
+    description: "This module serves as the entry point for the breast cancer classification program."
+    steps: |
+      1. Import necessary functions and modules:
+          a. From src.preprocess import load_data and preprocess_data.
+          b. From src.model import split_data and train_model.
+          c. From src.evaluate import load_model and evaluate_model.
+          d. From src.inference import preprocess_input_data and make_predictions.
+          e. Import argparse for command-line argument handling, os for file path handling, and pandas and numpy for data manipulation.
+      2. Define the main function.
+      3. Inside the main function:
+          a. Set up argument parsing for data_path, model_path, epochs, and batch_size.
+              - data_path: str, default=""
+              - model_path: str, default="trained_model_1.keras"
+              - epochs: int, default=100
+              - batch_size: int, default=32
+          b. Use a try-except block to handle potential exceptions.
+          c. Load the data from the specified data_path using the load_data function from the src.preprocess module. The load_data function should return the following:
+              - X: A pandas DataFrame containing the features.
+              - y: A pandas Series named 'target' containing the target variable.
+              - target_names: A list or array containing the names of the target classes.
+              - feature_names: A list or array containing the names of the features.
+          d. Ensure that the loaded data is in the correct format:
+              - The features (X) should be a pandas DataFrame.
+              - The target (y) should be a pandas Series and rename the target variable (y) to 'target'.
+          e. Print the shapes of the original data.
+          f. Preprocess the data using preprocess_data from preprocess.py.
+          g. Print the shapes of the preprocessed data.
+          h. Split the data using split_data from model.py.
+              - X_train (np.ndarray): The training input data.
+              - X_val (np.ndarray): The validation input data.
+              - X_test (np.ndarray): The test input data.
+              - y_train (np.ndarray): The training target data.
+              - y_val (np.ndarray): The validation target data.
+              - y_test (np.ndarray): The test target data.
+          i. Train the model using train_model from model.py.
+          j. If model training is successful:
+              - Load the trained model using load_model from evaluate.py.
+              - Evaluate the model using evaluate_model from evaluate.py.
+              - Print evaluation results.
+              - Demonstrate inference on a small subset of test data.
+          k. Print target names and feature names.
+      4. Implement comprehensive error handling to catch and print any exceptions.
+      5. Use if __name__ == "__main__": to call the main function when the script is run directly.
+    imports: |
+      import argparse
+      import numpy as np
+      import pandas as pd
+      from src.preprocess import load_data, preprocess_data
+      from src.model import split_data, train_model
+      from src.evaluate import load_model, evaluate_model
+      from src.inference import preprocess_input_data, make_predictions
+
+tests:
+  preprocess:
+    filename: tests/test_preprocess.py
+    module_name: src.preprocess
+    function_names: "load_data, preprocess_data"
+    test_scenarios: |
+      1. Import necessary modules and functions from src.preprocess.
+      2. Create fixtures for:
+          a. Random sample dataset.
+              - Generate a DataFrame with 30 feature columns and a 'target' column
+              - The feature column names can be any valid column names
+              - The 'target' column should contain binary values (0 and 1)
+              - Use numpy to generate random data for features and target
+          b. Temporary CSV file with sample data.
+      3. Implement test cases for the following scenarios:
+          a. Loading data from a file
+            - Use the temp_csv_file fixture
+            - Call load_data() with the file path.
+            - Verify that it returns four objects: data (DataFrame), target (Series), target_names (array), and feature_names (array).
+            - Check the types and basic properties of these returned objects.
+          b. Loading data from sklearn
+            - Call load_data() without arguments.
+            - Verify the shape, column names, and types of returned objects.
+            - Ensure the data doesn't contain a 'target' column.
+          c. Handling non-existent files
+            - Use pytest.raises(Exception) to test that an exception is raised when trying to load a non-existent file.
+          d. Basic preprocessing functionality:
+            - Use the sample_data fixture.
+            - Call preprocess_data() with features and target.
+            - Check for duplicate removal, missing value handling, and feature scaling.
+            - Feature scaling: verify that values are between 0 and 1
+          e. Handling invalid input data
+            - Test preprocess_data() with empty DataFrames or Series.
+            - Use pytest.raises(Exception) to check for appropriate error handling.
+          f. Processing data with missing values
+            - Modify the sample_data to include some NaN values.
+            - Verify that preprocess_data() handles these missing values correctly.
+          g. Feature scaling
+            - Focus on verifying that all values in the processed data are between 0 and 1.
+            - Use numpy's isclose() function for floating-point comparisons.
+          h. Handling data without a target column
+            - Test preprocess_data() with a DataFrame that doesn't have a 'target' column.
+            - Use pytest.raises(Exception) to check for appropriate error handling.
+          i. Handling column name mismatches (renaming columns if necessary)
+            - Modify column names in the sample_data.
+            - Verify that preprocess_data() can handle these mismatches, possibly by renaming columns.
+
+      4. For each test case:
+          - Using Exception provides flexibility in error handling implementation. Always use pytest.raises(Exception) for all error-checking tests.
+          - Avoid asserting on exact error message content
+          - Verify the expected behavior of the function
+          - Check for appropriate error handling and messaging
+          - Ensure the output data has the correct structure, shape, and content
+          - When comparing floating-point values, use floating-point number comparison (e.g., np.isclose) with appropriate tolerances
+
+      5. Use fixtures for setup and parametrize for testing multiple inputs where appropriate.
+
+      6. Follow the general guidelines provided for:
+          - Naming conventions
+          - Docstrings
+          - Assertions
+          - Error handling
+          - Floating-point comparisons
+          - File handling
+
+      Example structure:
+
+      ```python
+      import pytest
+      import pandas as pd
+      import numpy as np
+      from src.preprocess import load_data, preprocess_data
+
+      @pytest.fixture
+      def sample_data():
+          # Create sample breast cancer dataset
+          features = {f'feature_{i}': np.random.rand(100) for i in range(30)}
+          target = np.random.randint(0, 2, size=100)
+          return pd.DataFrame({**features, 'target': target})
+
+      @pytest.fixture
+      def temp_csv_file(tmp_path, sample_data):
+          # Create a temporary CSV file with sample data
+          file_path = tmp_path / "test_data.csv"
+          sample_data.to_csv(file_path, index=False)
+          return file_path
+
+      def test_load_data_from_sklearn():
+          # Test loading data from sklearn.
+          data = load_data()
+          assert isinstance(data, pd.DataFrame)
+          assert data.shape[1] == 31  # 30 features + 1 diagnosis column
+          assert 'target' in data.columns
+
+      def test_preprocess_data(sample_data):
+          # Test basic preprocessing functionality.
+          processed_data = preprocess_data(sample_data)
+          assert isinstance(processed_data, pd.DataFrame)
+          assert set(processed_data['target'].unique()) == {0, 1}
+          # Verify that the input data (X_train, X_val, X_test) has values between 0 and 1 using floating-point comparisons
+
+      # Implement other test functions as described above
+  model:
+    filename: tests/test_model.py
+    module_name: src.model
+    function_names: "build_model, split_data, train_model"
+    test_scenarios: |
+      1. Import pytest, os, tensorflow and necessary modules and functions from src.model.
+      2. Create fixtures for:
+          a. Sample breast cancer dataset
+              - Use the split_data function from src.model to split data into train, validation, and test sets
+              - Ensure the fixture returns 6 values: X_train, X_val, X_test, y_train, y_val, y_test
+          b. Temporary output directory
+          c. Built model
+
+      3. Implement test cases for the build_model function:
+          a. Model architecture
+              - Analyze the provided source code to determine the expected model architecture
+              - Verify number of layers
+              - Check layer types and units (for Dense layers) or rate (for Dropout layers)
+              - Verify layer names
+          b. Model compilation:
+              - Verify the optimizer is an instance of tf.keras.optimizers.Optimizer
+              - Check that the loss function is 'binary_crossentropy'
+              - Ensure the model has metrics (len(model.metrics) > 0)
+              - Do not check for specific metric names, as these may vary
+          d. Output shape
+          e. Error handling (Exception for incompatible shapes, OSError for saving issues)
+
+      4. Implement test cases for the train_model function:
+          a. Basic training functionality
+          b. Model performance
+              - Use loose performance metric thresholds (eg., val_accuracy > 0.6)
+          c. Model checkpointing
+          d. Early stopping
+          e. Training metrics
+
+      5. Implement integration tests:
+          a. Model save and load
+              - Save model using tf.keras.models.save_model(model, filepath)
+              - Load model using tf.keras.models.load_model(filepath)
+              - Set random seed before making predictions: tf.random.set_seed(42)
+              - Compare the predictions from the loaded model with the original predictions (from the trained model) using a small tolerance
+              - Use very loose thresholds to check if the predictions from the loaded model are within a reasonable range (e.g., assert that the mean of the predictions is between 0 and 1.0)
+
+      6. For each test case:
+          - Verify the expected behavior of the function
+          - Check for appropriate error handling and messaging
+          - Ensure the output has the correct structure, shape, and content
+
+      7. Use fixtures for setup and parametrize for testing multiple inputs where appropriate.
+
+      8. Follow the general guidelines provided for:
+          - Naming conventions
+          - Docstrings
+          - Assertions
+          - Error handling
+          - Floating-point comparisons
+          - File handling
+
+      Example structure:
+
+      ```python
+      import pytest
+      import numpy as np
+      import tensorflow as tf
+      import os
+      from src.model import build_model, train_model, split_data
+      from sklearn.datasets import load_breast_cancer
+
+      @pytest.fixture
+      def sample_data():
+          # Prepare sample breast cancer dataset
+          pass
+
+      @pytest.fixture
+      def temp_output_dir(tmp_path):
+          # Create temporary output directory
+          pass
+
+      def test_build_model_architecture():
+          # Test if the model has the correct architecture.
+          pass
+
+      # Implement other test functions as described above
+      ```
+  evaluate:
+    filename: tests/test_evaluate.py
+    module_name: src.evaluate
+    function_names: "load_model, load_test_data, evaluate_model"
+    test_scenarios: |
+      1. Import necessary modules and functions from src.evaluate, tensorflow, numpy, and sklearn.metrics.
+      2. Create fixtures for:
+          a. Create a fixture for a sample model (use tmp_path)
+              - Create a simple Sequential model
+              - Compile the model
+              - Use tf.keras.models.save_model(model, filepath, save_format='tf') to save the model with the .keras extension
+          b. Create a fixture for sample test data (use tmp_path)
+              - Generate random features (30 columns) and binary target
+              - Save as .npz file with keys 'X_test' and 'y_test'
+          c. Temporary files for model and test data storage
+
+      3. Implement test cases for the load_model function:
+          a. Successful model loading
+          b. Error handling for non-existent model files
+              - Use Exception instead of specific types
+              - Avoid asserting on exact error message content
+          c. Error handling for invalid model files
+              - Use Exception instead of specific types
+              - Avoid asserting on exact error message content
+      4. Implement test cases for the load_test_data function:
+          a. Successful test data loading
+          b. Error handling for invalid data formats
+          c. Error handling for missing data files
+          d. Important: Use pytest.raises(Exception) instead of pytest.raises(ValueError)
+
+      5. Implement test cases for the evaluate_model function:
+          a. test_evaluate_model_basic:
+            - Update the expected set of keys in the metrics dictionary
+            - Use {'accuracy', 'precision', 'recall', 'auc'} as the expected set
+          b. test_evaluate_model_metrics:
+            - Update the metric names in the parametrize decorator
+            - Use 'accuracy', 'precision', 'recall', 'auc' instead of '*_score' suffixes
+            - Ensure the keys in the metrics dictionary match these names
+          d. Error handling for various scenarios
+
+      6. Implement integration tests:
+          a. End-to-end evaluation process
+          b. Consistency of evaluation results across multiple runs
+
+      7. For each test case:
+          - Use pytest.raises(Exception) for all error checking
+          - Avoid asserting on exact error message content
+          - Verify the expected behavior of the function
+          - Check for appropriate error handling and messaging
+          - Ensure the output has the correct structure and content
+
+      8. Use fixtures for setup and parametrize for testing multiple inputs where appropriate.
+
+      9. Follow the general guidelines provided for:
+          - Naming conventions
+          - Docstrings
+          - Assertions
+          - Error handling
+          - Floating-point comparisons
+          - File handling
+
+      Example structure:
+
+      ```python
+      import pytest
+      import tensorflow as tf
+      import numpy as np
+      from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
+      from src.evaluate import load_model, load_test_data, evaluate_model
+
+      @pytest.fixture
+      def sample_model(tmp_path):
+          # Create and save a sample model
+          pass
+
+      @pytest.fixture
+      def sample_test_data(tmp_path):
+          # Generate and save sample test data
+          pass
+
+      def test_load_model_success(sample_model):
+          # Test successful model loading.
+          pass
+
+      def test_evaluate_model_basic(sample_model, sample_test_data):
+          # Test basic functionality of evaluate_model.
+          pass
+      @pytest.mark.parametrize("metric_name, metric_func", [
+          ('accuracy', accuracy_score),
+          ('precision', precision_score),
+          ('recall', recall_score),
+          ('auc', roc_auc_score)])
+      def test_evaluate_model_metrics(sample_model, sample_test_data, metric_name, metric_func):
+          # Test with correct metric names
+          pass
+          # Implement other test functions as described above
+      ```
+  inference:
+    filename: tests/test_inference.py
+    module_name: src.inference
+    function_names: "load_model, preprocess_input_data, make_predictions"
+    test_scenarios: |
+      1. Import necessary modules and functions from src.inference, tensorflow, numpy, and pandas.
+      2. Create fixtures for:
+          a. Create a fixture for a sample model (use tmp_path)
+              - Use tf.keras.models.save_model(model, filepath, save_format='tf') to save the model with the .keras extension
+          b. Create a fixture for sample input data matching the breast cancer dataset structure
+          c. Temporary files for model storage and prediction output
+
+      3. Implement test cases for the load_model function:
+          a. Successful model loading
+          b. Error handling for non-existent model files
+              - Use Exception instead of specific types
+              - Ensure the model file does not exist for the test case
+
+      4. Implement test cases for the preprocess_input_data function:
+          a. Successful data preprocessing
+              - Ensure the function call is assigned to a variable, e.g., preprocessed_data = preprocess_input_data(...)
+          b. Handling of missing values
+          c. Feature scaling
+          d. Error handling for invalid data formats
+
+      5. Implement test cases for the make_predictions function:
+          a. Successful prediction
+           - Always preprocess the input data before passing it to make_predictions
+          b. Use the returned preprocessed data, not the original input data
+          c. Output shape verification
+          d. Output type verification
+          e. Error handling for invalid model or data
+
+      6. Implement integration tests:
+          a. End-to-end inference process
+          b. Consistency of inference results across multiple runs
+
+      7. For each test case:
+          - Verify the expected behavior of the function
+          - Check for appropriate error handling and messaging
+          - Ensure the output has the correct structure and content
+
+      8. Use fixtures for setup and parametrize for testing multiple inputs where appropriate.
+
+      9. Follow the general guidelines provided for:
+          - Naming conventions
+          - Docstrings
+          - Assertions
+          - Error handling
+          - Floating-point comparisons
+          - File handling
+
+      Example structure:
+
+      ```python
+      import pytest
+      import numpy as np
+      import pandas as pd
+      import tensorflow as tf
+      from src.inference import load_model, preprocess_input_data, make_predictions
+
+      @pytest.fixture
+      def sample_model(tmp_path):
+          # Create and save a sample model
+          pass
+
+      @pytest.fixture
+      def sample_input_data():
+          # Generate sample input data
+          pass
+
+      def test_load_model_success(sample_model):
+          # Test successful model loading
+          pass
+
+      # Implement other test functions as described above
+      ```

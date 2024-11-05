@@ -1,0 +1,267 @@
+project_context_template:
+  role: system
+  content: |
+    Your task is to generate code for a {project_name} project using the {dataset_name}.
+    The project should follow this modular structure:
+    {project_structure}
+
+    You are only asked to provide a specified file containing solution in this prompt. 
+    Please focus solely on generating the content for this specific file, ignoring any other files in the project structure.
+
+    Follow these guidelines:
+    1. Implement appropriate error handling using try-except blocks.
+    2. Use type hints for function arguments and return values.
+    3. Follow PEP 8 guidelines for code formatting and style.
+    4. Include clear and concise docstrings for all functions and classes, following PEP 257 conventions.
+    5. Ensure the code is compatible with Python {python_version} and the latest versions of required libraries.
+
+module_code_format_template:
+  role: user
+  content: |
+    <description>
+    {description}
+    </description>
+    <steps>
+    {steps}
+    </steps>
+    <imports>
+    {imports}
+    </imports>
+    <code>
+    # {filename} code goes here
+    </code>
+    <filename>
+    {filename}
+    </filename>
+
+module_prompt_template:
+  role: user
+  content: |
+    <prompt>
+    {project_context}
+    
+    Please provide the code for {filename} using the following format.
+    IMPORTANT: Do not include any wrapping tags for the file itself. Start directly with the <description> tag:
+
+    {module_code_format}
+
+    Ensure to use the provided format for your response, and make sure to format the solution using the Code tool. 
+    </prompt>
+
+test_prompt_template:
+  role: user
+  content: |
+    This prompt provides comprehensive guidelines for creating flexible and robust test cases using pytest for the {module_name} module, covering various aspects of testing including fixtures, error handling, integration tests, and parameterization.
+
+    Steps:
+    1. Review the pytest.ini configuration:
+       {pytest_config}
+    2. Review the conftest.py file:
+       {conftest}
+    3. Analyze the source code file to identify testable features and functionalities
+    4. Create fixtures for sample data and test setup
+    5. Implement test cases for all identified features and functionalities
+    6. Include error handling tests
+    7. Implement integration tests
+    8. Use parameterization for multiple input testing
+    9. Ensure proper file handling in tests
+    10. Use flexible floating-point comparisons
+    11. Perform case-insensitive string comparisons in assertions
+    12. Follow PEP 8 style guidelines and include clear docstrings
+
+    Based on the source code file {module_name}:
+    {source_code}
+
+    Create test cases that cover all the features and functionalities of the source code file {module_name}.
+
+    Guidelines for creating test cases:
+    1. Create fixtures for sample data, temporary directories, and any other reusable test setup.
+    2. Use pytest's tmp_path fixture for handling test data and files:
+        - Create temporary files and directories for testing.
+        - For any test that requires file I/O, create temporary files within the tmp_path directory.
+        - Avoid using hard-coded file paths in tests.
+
+    Example usage of `tmp_path`:
+
+    ```python
+    def test_save_output(tmp_path):
+        output_file = tmp_path / "output.txt"
+        # Use output_file in your test
+        assert output_file.is_file()
+    ```
+    3. Use flexible floating-point comparisons:
+
+    Example of a test with flexible floating-point comparison:
+
+    ```python
+    def test_float_comparison():
+        result = some_function()
+        expected = 1.0
+        assert np.isclose(result, expected, rtol=1e-6, atol=1e-6)
+    ```
+    4. Using Exception provides flexibility in error handling implementation. Always use pytest.raises(Exception) for all error-checking tests:
+
+    Example of a test with flexible error handling:
+
+    ```python
+    def test_error_handling():
+        with pytest.raises(Exception) as exc_info:
+            # Function call that should raise an exception
+            function_that_raises_error()
+        error_message = str(exc_info.value).lower()
+        assert any(keyword in error_message for keyword in ['expected', 'error', 'invalid'])
+    ```
+
+    5. Implement integration tests to verify end-to-end functionality and consistency across multiple runs.
+    6. Use pytest.mark.parametrize for testing multiple inputs where appropriate:
+
+    Example of a test with multiple inputs:
+    ```python
+    @pytest.mark.parametrize("input,expected", [
+        (1, 2),
+        (2, 4),
+        (3, 6)
+    ])
+    def test_double(input, expected):
+        assert double(input) == expected
+    ```
+    7. Ensure all tests use descriptive names, include docstrings, and follow PEP 8 style guidelines.
+    8. Additional test cases following the guidelines in: {test_scenarios}
+
+    Ensure to use the following format for your response:
+    <description>
+    </description>
+    <steps>
+    {test_scenarios}
+    </steps>
+    <imports>
+    import pytest
+    import numpy as np
+    from {module_name} import {function_names}
+    </imports>
+    <code>
+    # Test code goes here
+    </code>
+    <filename>
+    {filename}
+    </filename>
+
+    Use the provided format for your response, and make sure to format the solution using the Code tool.
+fix_import_error_template:
+  role: user
+  content: |
+    The suggested solution received the following import error:
+
+    {error_message}
+
+    Here is the code snippet that caused the error:
+    
+    {code}
+
+    For reference, I have the following file structure:
+    
+    {file_tree}
+
+    Please provide a solution to resolve the import error for the line corresponding to the error message without introducing any additional logic or code. Keep the other import statements unchanged. Ensure to return the solution in the following JSON format:
+    
+    {
+        "description": "your description here",
+        "solution": "your import solution and other import statements here"
+    }
+
+fix_code_error_template:
+  role: user
+  content: |
+    The suggested solution {filename} received the following code error. All dependency modules are imported successfully.
+
+    {error_message}
+
+    Please provide a solution to resolve the error using the following format:
+
+    <description>
+    </description>
+    <steps>
+    </steps>
+    <imports>
+    </imports>
+    <code>
+    </code>
+    <filename>
+    {filename}
+    </filename>
+test_instructions:
+  role: user
+  content: |
+    IMPORTANT: When writing tests that check for exceptions:
+    1. DO NOT use an else block with pytest.raises(). This is incorrect and will cause a syntax error.
+    2. Instead, structure your exception tests like this:
+
+    def test_exception():
+        with pytest.raises(Exception, match="Key words in expected error message"):
+            # Code that should raise an exception
+        
+        # If you need to check that an exception is NOT raised, do it separately:
+        # Do not use 'else' here
+        result = function_that_should_not_raise()
+        assert result == expected_value
+
+    3. If you need to add a custom error message when an expected exception is not raised, do it like this:
+
+    def test_exception():
+        with pytest.raises(Exception):
+            # Code that should raise an exception
+        
+        # This line will only execute if the exception was not raised
+        pytest.fail("Expected ExpectedException was not raised")
+fix_pytest_template:
+  role: user
+  content: |
+    We are at ITERATIONS {iteration_count}.
+    
+    Analyze the following source, test codes and pytest error messages, then provide a complete solution to address all of the issues:
+
+    source code, {source_filename}:
+
+    {source_code}
+
+    test code, {test_filename}:
+
+    {test_code}
+
+    error messages:
+    {error_message}
+
+    ADDITIONAL GUIDELINES:
+    1. ONLY UPDATE THE FILE {filename}. DO NOT MODIFY OTHER FILES.
+    2. If you cannot provide a solution that makes the tests pass, return the original code without changes.
+    3. Do not explain the solution. Keep the original description and steps.
+    4. Make sure your tests follow the best practices for writing pytest tests, such as using descriptive test names, separating setup and teardown logic, and using fixtures when appropriate.
+    5. If unable to fix a specific test case after 2 ITERATIONS, comment out that test case in the code.
+    {test_instructions}
+    ---
+    CRITICAL: Your response MUST follow this format EXACTLY, using XML-style tags, with NO OTHER TEXT:
+
+    <description>
+    [Original one sentence summary of description]
+    log_history:
+    [If the log_history section doesn't exist, add the following line: Initial description.]
+    [If the log_history section already exists, append the existing log entries from log_history.]
+    [If there was a code update, append a new line to the existing log entries with the format: "{iteration_count}. Fixed issue with [description of what was fixed]."]
+    [If there was no code update, append a new line to the existing log entries with the format: "{iteration_count}. No change has been made this time because [reason for no update]."]
+    [If a test case was commented out, append a new line  to the existing log entries with the format: "{iteration_count}. Commented out test case [test case name or description] due to inability to fix it."
+    </description>
+    <steps>
+    Original steps, exactly as provided.
+    </steps>
+    <imports>
+    Necessary imports or original imports if no changes.
+    </imports>
+    <code>
+    Updated code without ```python``` tags, or original code if no changes.
+    </code>
+    <filename>
+    {filename}
+    </filename>
+
+    DO NOT include any text like "Here is the suggested solution" or any other commentary. 
+    ONLY provide the content within the specified XML tags.

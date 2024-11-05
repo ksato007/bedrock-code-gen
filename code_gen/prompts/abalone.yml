@@ -1,0 +1,356 @@
+project_name: "Abalone Age Regression"
+dataset_names: "Abalone Dataset"
+project_structure: |
+  abalone_regression/
+  ├── src/
+  │   ├── preprocess.py
+  │   ├── model.py
+  │   ├── evaluate.py
+  │   ├── inference.py
+  ├── main.py
+  ├── tests/
+  │   ├── test_preprocess.py
+  │   ├── test_model.py
+  │   ├── test_evaluate.py
+  │   ├── test_inference.py
+  ├── pytest.ini
+  ├── conftest.py
+  └── requirements.txt
+
+pytest_config:
+  filename: pytest.ini
+  content: |
+    [pytest]
+    pythonpath = . src
+    markers =
+        optional: mark tests as optional
+        last: marks tests that should run last
+        temp_file: marks tests that use temporary files
+    addopts = -v --tb=short --strict-markers --import-mode=importlib  --basetemp=./tmp
+    testpaths = tests
+    python_files = test_*.py
+    python_classes = Test*
+    python_functions = test_*
+    venv_name = {venv_name}
+
+conftest:
+  filename: conftest.py
+  content: |
+    import pytest
+    import os
+    import sys
+    import tempfile
+    import shutil
+
+    def pytest_addoption(parser):
+        parser.addini('venv_name', 'Name of the virtual environment', default='.venv')
+
+    def pytest_collection_modifyitems(items):
+        # Ensure tests marked with 'last' run at the end of the test suite.
+        last_tests = [item for item in items if item.get_closest_marker("last")]
+        for test in last_tests:
+            items.remove(test)
+            items.append(test)
+
+    @pytest.fixture(scope="session", autouse=True)
+    def setup_test_environment(request):
+        # Set up the test environment before running tests.
+        # Get the expected virtual environment path
+        project_root = os.path.dirname(os.path.dirname(__file__))  # ex. breast_cancer directory
+        expected_venv_path = os.path.join(project_root, "{venv_name}")
+        
+        # Check if we're running in the correct virtual environment
+        current_venv = os.environ.get("VIRTUAL_ENV")
+        if current_venv != expected_venv_path:
+            pytest.exit(f"Tests are not running in the expected virtual environment. Expected: {{expected_venv_path}} Current: {{current_venv}}")
+
+        # Add the project root to sys.path if it's not already there
+        if project_root not in sys.path:
+            sys.path.insert(0, project_root)
+
+        # Add the src directory to sys.path if it's not already there
+        src_dir = os.path.join(project_root, "src")
+        if src_dir not in sys.path:
+            sys.path.insert(0, src_dir)
+
+        # Print some debug information
+        print(f"Project root: {{project_root}}")
+        print(f"Expected venv path: {{expected_venv_path}}")
+        print(f"Current VIRTUAL_ENV: {{current_venv}}")
+        print(f"PYTHONPATH: {{os.environ.get('PYTHONPATH', 'Not set')}}")
+        print(f"sys.path: {{sys.path}}")
+
+        # Create a temporary directory for the test session
+        temp_dir = tempfile.mkdtemp()
+        request.addfinalizer(lambda: shutil.rmtree(temp_dir))
+        return temp_dir
+
+    @pytest.fixture(scope="function")
+    def sample_data():
+        n_samples = 3
+        abalone_features = ['Sex', 'Length', 'Diameter', 'Height', 'Whole weight', 'Shucked weight', 'Viscera weight', 'Shell weight']
+        
+        return {{
+            "features": abalone_features,
+            "target": "Rings",
+            "data": {{
+                'Sex': np.random.choice(['M', 'F', 'I'], n_samples).tolist(),
+                'Length': np.random.uniform(0.075, 0.815, n_samples).tolist(),
+                'Diameter': np.random.uniform(0.055, 0.650, n_samples).tolist(),
+                'Height': np.random.uniform(0.000, 1.130, n_samples).tolist(),
+                'Whole weight': np.random.uniform(0.002, 2.826, n_samples).tolist(),
+                'Shucked weight': np.random.uniform(0.001, 1.488, n_samples).tolist(),
+                'Viscera weight': np.random.uniform(0.001, 0.760, n_samples).tolist(),
+                'Shell weight': np.random.uniform(0.002, 1.005, n_samples).tolist(),
+                'Rings': np.random.randint(1, 30, n_samples).tolist()
+            }}
+        }}
+
+
+
+    @pytest.fixture(scope="function")
+    def temp_dir(tmp_path):
+        # Provide a temporary directory for the test function.
+        return tmp_path
+
+    @pytest.fixture(scope="function")
+    def temp_file(temp_dir):
+        # Provide a temporary file for the test function.
+        temp_file = temp_dir / "test_file.txt"
+        temp_file.write_text("This is a test file.")
+        return temp_file
+
+coveragerc:
+  filename: .coveragerc
+  content: |
+    [run]
+    omit = tests/conftest.py, main.py, *__init__.py
+    parallel = True
+    fail_under = 80
+
+modules:
+  requirements:
+    filename: requirements.txt
+    description: "Lists all the external dependencies and their versions required to run the abalone age regression program."
+    steps: |
+      1. Specify each required library and its version on a separate line.
+      2. Include libraries such as pandas, numpy, scikit-learn, and potentially xgboost or lightgbm for regression, along with their respective minimum version requirements.
+    code: |
+      pandas
+      numpy
+      scikit-learn
+      xgboost
+  preprocess:
+    filename: src/preprocess.py
+    description: "This module contains functions to preprocess the abalone dataset, including data cleaning, encoding categorical variables, and feature scaling."
+    steps: |
+      1. Import the necessary libraries: pandas, numpy, and sklearn.
+      2. Define load_data function:
+          a. Accept file_path argument (optional)
+          b. Load data from file if provided, else from a public repository or local storage
+          c. The dataset should have the following features:
+             - 'Sex': categorical (M, F, I)
+             - 'Length': continuous
+             - 'Diameter': continuous
+             - 'Height': continuous
+             - 'Whole weight': continuous
+             - 'Shucked weight': continuous
+             - 'Viscera weight': continuous
+             - 'Shell weight': continuous
+             - 'Rings': integer (target variable, representing age)
+          d. Handle exceptions for file not found
+      3. Define preprocess_data function:
+          a. Load data using load_data if needed
+          b. Handle missing values if any
+          c. Encode the 'Sex' categorical variable (e.g., using one-hot encoding)
+          d. Scale numerical features using StandardScaler
+          e. Handle exceptions for invalid input
+      4. Include error handling for exceptions.
+      5. Add docstrings and type hints.
+    imports: |
+      import pandas as pd
+      import numpy as np
+      from sklearn.preprocessing import StandardScaler, OneHotEncoder
+      from sklearn.compose import ColumnTransformer
+      from sklearn.pipeline import Pipeline
+  model:
+    filename: src/model.py
+    description: "Defines the machine learning model architecture for regression of abalone age based on physical measurements."
+    steps: |
+      1. Import necessary libraries (sklearn, potentially xgboost or lightgbm).
+      2. Define the build_model function that creates a regression model:
+          - Consider using ensemble methods like RandomForestRegressor or GradientBoostingRegressor
+          - Alternatively, use XGBoostRegressor or LGBMRegressor for potentially better performance
+          - Set random seed for reproducibility: np.random.seed(42)
+      3. Configure the model with appropriate hyperparameters (e.g., n_estimators, max_depth, learning_rate).
+      4. Implement a split_data function to divide the preprocessed data into training and test sets (80% training, 20% test).
+      5. Implement the train_model function:
+          a. Fit the model on the training data.
+          b. Implement cross-validation for hyperparameter tuning if needed.
+          c. Return the trained model and any relevant training metrics.
+      6. Implement a save_model function to persist the trained model to disk.
+          a. Use joblib.dump() with a specific protocol version (e.g., protocol=4)
+          b. Include model metadata (e.g., creation date, model version) in the saved file
+          c. Implement a checksum or verification step after saving
+      7. Implement error handling for exceptions.
+    imports: |
+      import numpy as np
+      from sklearn.model_selection import train_test_split
+      from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+      import joblib
+  evaluate:
+    filename: src/evaluate.py
+    description: "This module contains functions to evaluate the performance of the trained regression model for abalone age prediction."
+    steps: |
+      1. Import necessary libraries (sklearn.metrics).
+      2. Define load_model function:
+          - Load model from specified file
+          - Handle exceptions for non-existent model files and invalid model files
+      3. Define evaluate_model function:
+          - Take model, X_test, and y_test as inputs
+          - Make predictions on test data
+          - Calculate metrics: Mean Squared Error (MSE), Mean Absolute Error (MAE), R-squared
+          - Return dictionary of evaluation results
+    imports: |
+      from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+      import numpy as np
+      import joblib
+  inference:
+    filename: src/inference.py
+    description: "This module contains functions to make predictions on new, unseen data using the trained abalone age regression model."
+    steps: |
+      1. Import necessary libraries (numpy, pandas) and from src.preprocess import preprocess_data.
+      2. Define a function `load_model` that loads the trained model from the specified file path:
+          a. Use a try-except block to catch specific exceptions (FileNotFoundError, EOFError, etc.)
+          b. Verify the loaded object is of the expected type (e.g., sklearn estimator or pipeline)
+          c. If loading fails, raise a custom exception with a descriptive message
+      3. Define a function `preprocess_input_data` that takes new, unseen data as input.
+      4. Inside the `preprocess_input_data` function:
+          a. Call the preprocess_data function from src.preprocess to preprocess the input data.
+          b. Return the preprocessed input data.
+          c. Implement error handling for exceptions if the input data is invalid or has incorrect data types.
+      5. Define a function `make_predictions` that takes the preprocessed input data and the loaded model as input, and returns the model predictions.
+      6. Inside the `make_predictions` function:
+          a. Make predictions using the loaded model and the preprocessed input data.
+          b. Implement error handling for exceptions when making predictions, such as invalid model or data.
+          c. Return the predictions (abalone ages).
+    imports: |
+      import numpy as np
+      import pandas as pd
+      from src.preprocess import preprocess_data
+      import joblib
+  main:
+    filename: main.py
+    description: "This module serves as the entry point for the abalone age regression program."
+    steps: |
+      1. Import necessary functions and modules:
+          a. From src.preprocess import load_data and preprocess_data.
+          b. From src.model import split_data, train_model, and save_model.
+          c. From src.evaluate import load_model and evaluate_model.
+          d. From src.inference import preprocess_input_data and make_predictions.
+          e. Import argparse for command-line argument handling, os for file path handling, and pandas and numpy for data manipulation.
+      2. Define the main function.
+      3. Inside the main function:
+          a. Set up argument parsing for data_path and model_path.
+              - data_path: str, default=""
+              - model_path: str, default="trained_model.joblib"
+          b. Use a try-except block to handle potential exceptions.
+          c. Load the data from the specified data_path using the load_data function from the src.preprocess module.
+          d. Preprocess the data using preprocess_data from preprocess.py.
+          e. Split the data using split_data from model.py.
+          f. Train the model using train_model from model.py.
+          g. Save the trained model using save_model from model.py.
+          h. Evaluate the model using evaluate_model from evaluate.py.
+          i. Print evaluation results.
+          j. Demonstrate inference on a small subset of test data.
+      4. Implement comprehensive error handling to catch and print any exceptions.
+      5. Use if __name__ == "__main__": to call the main function when the script is run directly.
+    imports: |
+      import argparse
+      import numpy as np
+      import pandas as pd
+      from src.preprocess import load_data, preprocess_data
+      from src.model import split_data, train_model, save_model
+      from src.evaluate import load_model, evaluate_model
+      from src.inference import preprocess_input_data, make_predictions
+
+tests:
+  preprocess:
+    filename: tests/test_preprocess.py
+    module_name: src.preprocess
+    function_names: "load_data, preprocess_data"
+    test_scenarios: |
+      1. Import necessary modules and functions from src.preprocess.
+      2. Create fixtures for:
+          a. Random sample dataset.
+              - Generate a DataFrame with columns: 'Sex', 'Length', 'Diameter', 'Height', 'Whole weight', 'Shucked weight', 'Viscera weight', 'Shell weight', 'Rings'
+              - The 'Sex' column should contain categorical values (M, F, I)
+              - Other columns should contain appropriate numerical values
+              - Use numpy to generate random data
+          b. Temporary CSV file with sample data.
+      3. Implement test cases for the following scenarios:
+          a. Loading data from a file
+            - Use the temp_csv_file fixture
+            - Call load_data() with the file path
+            - Verify that it returns a DataFrame with the correct structure
+          b. Loading data from default source (if applicable)
+            - Call load_data() without arguments
+            - Verify the shape, column names, and types of returned objects
+          c. Handling non-existent files
+            - Use pytest.raises(Exception) to test that an exception is raised when trying to load a non-existent file
+          d. Basic preprocessing functionality:
+            - Use the sample_data fixture
+            - Call preprocess_data() with the sample data
+            - Check for proper encoding of the 'Sex' column
+            - Verify feature scaling for numerical columns
+          e. Handling invalid input data
+            - Test preprocess_data() with empty DataFrames or invalid data types
+            - Use pytest.raises(Exception) to check for appropriate error handling
+          f. Processing data with missing values
+            - Modify the sample_data to include some NaN values
+            - Verify that preprocess_data() handles these missing values correctly
+          g. Feature scaling
+            - Verify that numerical features are properly scaled
+            - Use numpy's isclose() function for floating-point comparisons
+      4. For each test case:
+          - Use pytest.raises(Exception) for all error-checking tests
+          - Avoid asserting on exact error message content
+          - Verify the expected behavior of the function
+          - Check for appropriate error handling and messaging
+          - Ensure the output data has the correct structure, shape, and content
+
+      Example structure:
+
+      ```python
+      import pytest
+      import pandas as pd
+      import numpy as np
+      from src.preprocess import load_data, preprocess_data
+
+      @pytest.fixture
+      def sample_data():
+          # Create sample abalone dataset
+          data = {
+              'Sex': np.random.choice(['M', 'F', 'I'], 100),
+              'Length': np.random.uniform(0.1, 0.8, 100),
+              'Diameter': np.random.uniform(0.1, 0.6, 100),
+              'Height': np.random.uniform(0.01, 0.3, 100),
+              'Whole weight': np.random.uniform(0.002, 2.5, 100),
+              'Shucked weight': np.random.uniform(0.001, 1.0, 100),
+              'Viscera weight': np.random.uniform(0.001, 0.5, 100),
+              'Shell weight': np.random.uniform(0.002, 1.0, 100),
+              'Rings': np.random.randint(1, 30, 100)
+          }
+          return pd.DataFrame(data)
+
+      @pytest.fixture
+      def temp_csv_file(tmp_path, sample_data):
+          # Create a temporary CSV file with sample data
+          file_path = tmp_path / "test_data.csv"
+          sample_data.to_csv(file_path, index=False)
+          return file_path
+
+      def test_load_data_from_file(temp_csv_file):
+          # Test loading data from a file
+          data = load_data(temp_csv_file)
+          assert isinstance(

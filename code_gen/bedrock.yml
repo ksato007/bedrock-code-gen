@@ -1,0 +1,96 @@
+# https://docs.aws.amazon.com/bedrock/latest/userguide/model-ids.html#model-ids-arns
+model_providers:
+  amazon:
+    titan-text-g1-express:
+      1.x: amazon.titan-text-express-v1
+    titan-text-g1-lite:
+      1.x: amazon.titan-text-lite-v1
+    titan-text-premier:
+      1.x: amazon.titan-text-premier-v1:0
+    titan-embeddings-g1-text:
+      1.x: amazon.titan-embed-text-v1
+    titan-embedding-text-v2:
+      1.x: amazon.titan-embed-text-v2:0
+    titan-multimodal-embeddings-g1:
+      1.x: amazon.titan-embed-image-v1
+    titan-image-generator-g1:
+      1.x: amazon.titan-image-generator-v1
+  anthropic:
+    claude:
+      2.0: anthropic.claude-v2
+      2.1: anthropic.claude-v2:1
+    claude-3-sonnet:
+      1.0: anthropic.claude-3-sonnet-20240229-v1:0
+    "[claude-3.5-sonnet]":
+      1.0: anthropic.claude-3-5-sonnet-20240620-v1:0
+    claude-3-haiku:
+      1.0: anthropic.claude-3-haiku-20240307-v1:0
+    claude-3-opus:
+      1.0: anthropic.claude-3-opus-20240229-v1:0
+    claude-instant:
+      1.x: anthropic.claude-instant-v1
+  ai21_labs:
+    jurassic-2-mid:
+      1.x: ai21.j2-mid-v1
+    jurassic-2-ultra:
+      1.x: ai21.j2-ultra-v1
+  cohere:
+    command:
+      14.x: cohere.command-text-v14
+    command-light:
+      15.x: cohere.command-light-text-v14
+    command-r:
+      1.x: cohere.command-r-v1:0
+    command-r+:
+      1.x: cohere.command-r-plus-v1:0
+    embed-english:
+      3.x: cohere.embed-english-v3
+    embed-multilingual:
+      3.x: cohere.embed-multilingual-v3
+  meta:
+    llama-2-chat-13b:
+      1.x: meta.llama2-13b-chat-v1
+    llama-2-chat-70b:
+      1.x: meta.llama2-70b-chat-v1
+    llama-3-8b-instruct:
+      1.x: meta.llama3-8b-instruct-v1:0
+    llama-3-70b-instruct:
+      1.x: meta.llama3-70b-instruct-v1:0
+  mistral_ai:
+    mistral-7b-instruct:
+      0.x: mistral.mistral-7b-instruct-v0:2
+    mixtral-8x7b-instruct:
+      0.x: mistral.mixtral-8x7b-instruct-v0:1
+    mistral-large:
+      1.x: mistral.mistral-large-2402-v1:0
+    mistral-small:
+      1.x: mistral.mistral-small-2402-v1:0
+  stability_ai:
+    stable-diffusion-xl:
+      0.x: stability.stable-diffusion-xl-v0
+      1.x: stability.stable-diffusion-xl-v1
+# provisioned_throughput:
+  # us-east-1:
+  #   anthropic:
+  #     calude-3-sonnet:
+  #       28k: anthropic.claude-3-sonnet-20240229-v1:0:28k
+  #       100k: anthropic.claude-3-sonnet-20240229-v1:0
+  #       200k: anthropic.claude-3-sonnet-20240229-v1:0:200k
+  #     calude-3-haiku:
+  #       48k: anthropic.claude-3-haiku-20240307-v1:0:48k
+  #       100k: anthropic.claude-3-haiku-20240307-v1:0
+  #       200k: anthropic.claude-3-haiku-20240307-v1:0:200k
+  #     calude-3-opus:
+  #       200k: null
+  # us-west-2:
+  #   anthropic:
+  #     calude-3-sonnet:
+  #       28k: anthropic.claude-3-sonnet-20240229-v1:0:28k
+  #       100k: anthropic.claude-3-sonnet-20240229-v1:0
+  #       200k: anthropic.claude-3-sonnet-20240229-v1:0:200k
+  #     calude-3-haiku:
+  #       48k: anthropic.claude-3-haiku-20240307-v1:0:48k
+  #       100k: anthropic.claude-3-haiku-20240307-v1:0
+  #       200k: anthropic.claude-3-haiku-20240307-v1:0:200k
+  #     calude-3-opus:
+  #       200k: anthropic.claude-3-opus-20230619-v1:0

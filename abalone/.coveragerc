@@ -1,0 +1,4 @@
+[run]
+omit = tests/conftest.py, main.py, *__init__.py
+parallel = True
+fail_under = 80
